@@ -1,0 +1,787 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// ENUMS
+// =============================================
+
+enum UserRole {
+  STUDENT
+  FACULTY
+  DEPARTMENT_ADMIN
+  INSTITUTION_ADMIN
+  SUPER_ADMIN
+  SUPPORT_AGENT
+}
+
+enum FacultyStatus {
+  FREE
+  IN_MEETING
+  IN_CLASS
+  ON_LEAVE
+  DO_NOT_DISTURB
+  BUSY
+  OFFLINE
+}
+
+enum AppointmentStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum TokenStatus {
+  WAITING
+  CALLED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
+  EXPIRED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_USER
+  WAITING_ON_AGENT
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum OnboardingStatus {
+  STARTED
+  INSTITUTION_CREATED
+  DEPARTMENTS_ADDED
+  FACULTY_INVITED
+  STUDENTS_INVITED
+  CONFIGURED
+  COMPLETED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum AnnouncementScope {
+  PLATFORM
+  INSTITUTION
+  DEPARTMENT
+}
+
+enum NotificationType {
+  APPOINTMENT_REQUESTED
+  APPOINTMENT_APPROVED
+  APPOINTMENT_REJECTED
+  APPOINTMENT_RESCHEDULED
+  TOKEN_CALLED
+  QUEUE_POSITION_UPDATE
+  STATUS_CHANGE
+  REMINDER
+  INVITATION
+  TICKET_UPDATE
+  ANNOUNCEMENT
+  BILLING
+  SYSTEM
+}
+
+enum ScheduleType {
+  OFFICE_HOURS
+  CLASS
+  MEETING
+  UNAVAILABLE
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  VACATION
+  CONFERENCE
+  OTHER
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum PlanType {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+// =============================================
+// INSTITUTION & ONBOARDING
+// =============================================
+
+model Institution {
+  id                        String            @id @default(cuid())
+  name                      String
+  code                      String            @unique
+  slug                      String            @unique
+  address                   String?
+  city                      String?
+  state                     String?
+  country                   String            @default("India")
+  pincode                   String?
+  phone                     String?
+  email                     String?
+  website                   String?
+  logo                      String?
+  favicon                   String?
+  primaryColor              String?           @default("#2563EB")
+  timezone                  String            @default("Asia/Kolkata")
+  workingDays               Int[]             @default([1, 2, 3, 4, 5])
+  workingHoursStart         String            @default("09:00")
+  workingHoursEnd           String            @default("17:00")
+  maxAppointmentsPerStudent Int               @default(3)
+  tokenAutoExpireMinutes    Int               @default(30)
+  isActive                  Boolean           @default(true)
+  isSuspended               Boolean           @default(false)
+  suspensionReason          String?
+  onboardingStatus          OnboardingStatus  @default(STARTED)
+  onboardedBy               String?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  departments   Department[]
+  users         User[]
+  invitations   Invitation[]
+  subscriptions Subscription[]
+  announcements Announcement[]
+  tickets       SupportTicket[]
+  articles      KnowledgeBaseArticle[]
+  auditLogs     AuditLog[]
+  appointments  Appointment[]
+  tokens        Token[]
+
+  @@map("institutions")
+}
+
+model Department {
+  id               String   @id @default(cuid())
+  institutionId    String
+  name             String
+  code             String
+  description      String?
+  headOfDepartment String?
+  email            String?
+  phone            String?
+  building         String?
+  floor            String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  users         User[]
+  invitations   Invitation[]
+  announcements Announcement[]
+  appointments  Appointment[]
+
+  @@unique([institutionId, code])
+  @@map("departments")
+}
+
+// =============================================
+// USER MANAGEMENT
+// =============================================
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  phone             String?
+  avatar            String?
+  role              UserRole
+  isActive          Boolean   @default(true)
+  isEmailVerified   Boolean   @default(false)
+  isSuspended       Boolean   @default(false)
+  suspensionReason  String?
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+  institutionId     String?
+  departmentId      String?
+  lastLoginAt       DateTime?
+  loginAttempts     Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  institution        Institution?     @relation(fields: [institutionId], references: [id])
+  department         Department?      @relation(fields: [departmentId], references: [id])
+  studentProfile     StudentProfile?
+  facultyProfile     FacultyProfile?
+  refreshTokens      RefreshToken[]
+  invitationsSent    Invitation[]     @relation("InvitedBy")
+  notifications      Notification[]
+  sentTickets        SupportTicket[]  @relation("TicketCreator")
+  assignedTickets    SupportTicket[]  @relation("TicketAgent")
+  ticketMessages     TicketMessage[]
+  articlesAuthored   KnowledgeBaseArticle[]
+  announcementsAuthored Announcement[]
+  auditLogs          AuditLog[]
+  studentAppointments Appointment[]   @relation("StudentAppointments")
+  facultyAppointments Appointment[]   @relation("FacultyAppointments")
+  studentTokens      Token[]          @relation("StudentTokens")
+  facultyTokens      Token[]          @relation("FacultyTokens")
+
+  @@map("users")
+}
+
+model StudentProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  rollNumber    String?
+  admissionYear Int?
+  program       String?
+  semester      Int?
+  batch         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("student_profiles")
+}
+
+model FacultyProfile {
+  id                      String        @id @default(cuid())
+  userId                  String        @unique
+  employeeId              String?
+  designation             String?
+  specialization          String?
+  cabinNumber             String?
+  building                String?
+  floor                   String?
+  currentStatus           FacultyStatus @default(OFFLINE)
+  statusMessage           String?
+  statusUpdatedAt         DateTime      @default(now())
+  autoStatusEnabled       Boolean       @default(false)
+  isAcceptingAppointments Boolean       @default(true)
+  maxDailyAppointments    Int           @default(10)
+  appointmentSlotDuration Int           @default(15)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schedules FacultySchedule[]
+  leaves    FacultyLeave[]
+
+  @@map("faculty_profiles")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  type      String   // email_verification, password_reset
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("verification_tokens")
+}
+
+// =============================================
+// INVITATIONS
+// =============================================
+
+model Invitation {
+  id            String           @id @default(cuid())
+  institutionId String
+  email         String
+  role          UserRole
+  departmentId  String?
+  invitedById   String
+  token         String           @unique
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  department  Department? @relation(fields: [departmentId], references: [id])
+  invitedBy   User        @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  @@index([email])
+  @@index([token])
+  @@map("invitations")
+}
+
+// =============================================
+// APPOINTMENTS
+// =============================================
+
+model Appointment {
+  id                  String            @id @default(cuid())
+  institutionId       String
+  studentId           String
+  facultyId           String
+  departmentId        String?
+  title               String
+  purpose             String?
+  requestedDate       DateTime
+  requestedStartTime  String
+  requestedEndTime    String?
+  confirmedDate       DateTime?
+  confirmedStartTime  String?
+  confirmedEndTime    String?
+  status              AppointmentStatus @default(REQUESTED)
+  priority            TicketPriority    @default(MEDIUM)
+  rejectionReason     String?
+  cancellationReason  String?
+  rescheduledFrom     String?
+  completedAt         DateTime?
+  facultyNotes        String?
+  studentNotes        String?
+  rating              Int?
+  feedback            String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  institution Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  student     User         @relation("StudentAppointments", fields: [studentId], references: [id])
+  faculty     User         @relation("FacultyAppointments", fields: [facultyId], references: [id])
+  department  Department?  @relation(fields: [departmentId], references: [id])
+  documents   AppointmentDocument[]
+  tokens      Token[]
+
+  @@index([studentId])
+  @@index([facultyId])
+  @@index([institutionId, status])
+  @@index([requestedDate])
+  @@map("appointments")
+}
+
+model AppointmentDocument {
+  id            String   @id @default(cuid())
+  appointmentId String
+  fileName      String
+  fileUrl       String
+  fileType      String
+  fileSize      Int
+  uploadedBy    String
+  description   String?
+  aiAnalysis    String?
+  createdAt     DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@map("appointment_documents")
+}
+
+// =============================================
+// QUEUE / TOKEN SYSTEM
+// =============================================
+
+model Token {
+  id                  String      @id @default(cuid())
+  institutionId       String
+  facultyId           String
+  studentId           String
+  appointmentId       String?
+  tokenNumber         Int
+  tokenDisplay        String
+  status              TokenStatus @default(WAITING)
+  queuePosition       Int?
+  estimatedWaitMinutes Int?
+  calledAt            DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  skippedAt           DateTime?
+  cancelledAt         DateTime?
+  skipReason          String?
+  cancelReason        String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  institution Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  faculty     User         @relation("FacultyTokens", fields: [facultyId], references: [id])
+  student     User         @relation("StudentTokens", fields: [studentId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@index([facultyId, status])
+  @@index([studentId])
+  @@index([institutionId, createdAt])
+  @@map("tokens")
+}
+
+// =============================================
+// FACULTY SCHEDULE & LEAVE
+// =============================================
+
+model FacultySchedule {
+  id           String       @id @default(cuid())
+  facultyId    String
+  dayOfWeek    Int          // 0 = Sunday, 6 = Saturday
+  startTime    String
+  endTime      String
+  scheduleType ScheduleType
+  label        String?
+  location     String?
+  isRecurring  Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  faculty FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId, dayOfWeek])
+  @@map("faculty_schedules")
+}
+
+model FacultyLeave {
+  id          String    @id @default(cuid())
+  facultyId   String
+  startDate   DateTime
+  endDate     DateTime
+  leaveType   LeaveType
+  reason      String?
+  isApproved  Boolean   @default(false)
+  approvedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  faculty FacultyProfile @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId, startDate, endDate])
+  @@map("faculty_leaves")
+}
+
+// =============================================
+// SUPPORT SYSTEM
+// =============================================
+
+model SupportTicket {
+  id                   String         @id @default(cuid())
+  institutionId        String?
+  createdById          String
+  assignedToId         String?
+  ticketNumber         String         @unique
+  title                String
+  description          String
+  category             String
+  status               TicketStatus   @default(OPEN)
+  priority             TicketPriority @default(MEDIUM)
+  isEscalated          Boolean        @default(false)
+  escalatedAt          DateTime?
+  resolvedAt           DateTime?
+  closedAt             DateTime?
+  reopenedAt           DateTime?
+  firstResponseAt      DateTime?
+  satisfactionRating   Int?
+  satisfactionFeedback String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  institution Institution?    @relation(fields: [institutionId], references: [id])
+  creator     User            @relation("TicketCreator", fields: [createdById], references: [id])
+  agent       User?           @relation("TicketAgent", fields: [assignedToId], references: [id])
+  messages    TicketMessage[]
+
+  @@index([status])
+  @@index([createdById])
+  @@index([assignedToId])
+  @@index([institutionId])
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id             String   @id @default(cuid())
+  ticketId       String
+  senderId       String
+  message        String
+  isInternal     Boolean  @default(false)
+  isAutoResponse Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id])
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
+model CannedResponse {
+  id            String   @id @default(cuid())
+  institutionId String?  // null = platform-wide
+  title         String
+  content       String
+  category      String
+  shortcut      String?
+  usageCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([category])
+  @@map("canned_responses")
+}
+
+// =============================================
+// KNOWLEDGE BASE
+// =============================================
+
+model KnowledgeBaseArticle {
+  id              String    @id @default(cuid())
+  institutionId   String?   // null = platform-wide
+  title           String
+  slug            String
+  content         String
+  excerpt         String?
+  category        String
+  tags            String[]  @default([])
+  authorId        String
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  viewCount       Int       @default(0)
+  helpfulCount    Int       @default(0)
+  notHelpfulCount Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  institution Institution? @relation(fields: [institutionId], references: [id])
+  author      User         @relation(fields: [authorId], references: [id])
+
+  @@unique([institutionId, slug])
+  @@index([category])
+  @@index([isPublished])
+  @@map("knowledge_base_articles")
+}
+
+// =============================================
+// ANNOUNCEMENTS
+// =============================================
+
+model Announcement {
+  id            String            @id @default(cuid())
+  institutionId String?
+  departmentId  String?
+  authorId      String
+  title         String
+  content       String
+  scope         AnnouncementScope
+  isPublished   Boolean           @default(false)
+  publishedAt   DateTime?
+  expiresAt     DateTime?
+  isPinned      Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  institution Institution? @relation(fields: [institutionId], references: [id])
+  department  Department?  @relation(fields: [departmentId], references: [id])
+  author      User         @relation(fields: [authorId], references: [id])
+
+  @@index([scope, isPublished])
+  @@map("announcements")
+}
+
+// =============================================
+// NOTIFICATIONS
+// =============================================
+
+model Notification {
+  id            String           @id @default(cuid())
+  userId        String
+  institutionId String?
+  type          NotificationType
+  title         String
+  message       String
+  data          Json?
+  isRead        Boolean          @default(false)
+  readAt        DateTime?
+  actionUrl     String?
+  expiresAt     DateTime?
+  createdAt     DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// =============================================
+// SUBSCRIPTIONS & BILLING
+// =============================================
+
+model Subscription {
+  id                    String             @id @default(cuid())
+  institutionId         String
+  planType              PlanType           @default(FREE)
+  status                SubscriptionStatus @default(TRIALING)
+  billingCycle          BillingCycle       @default(MONTHLY)
+  amount                Int                @default(0)
+  currency              String             @default("INR")
+  currentPeriodStart    DateTime           @default(now())
+  currentPeriodEnd      DateTime
+  trialEndsAt           DateTime?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  paymentGateway        String?            // razorpay, stripe
+  gatewaySubscriptionId String?
+  gatewayCustomerId     String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  invoices    Invoice[]
+
+  @@index([institutionId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  institutionId    String
+  subscriptionId   String
+  invoiceNumber    String        @unique
+  amount           Int
+  tax              Int           @default(0)
+  total            Int
+  currency         String        @default("INR")
+  status           InvoiceStatus @default(PENDING)
+  dueDate          DateTime
+  paidAt           DateTime?
+  paymentMethod    String?
+  gatewayPaymentId String?
+  pdfUrl           String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([institutionId])
+  @@index([status])
+  @@map("invoices")
+}
+
+// =============================================
+// AUDIT LOGS
+// =============================================
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  institutionId String?
+  userId        String?
+  action        String
+  entityType    String
+  entityId      String?
+  oldValues     Json?
+  newValues     Json?
+  ipAddress     String?
+  userAgent     String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  institution Institution? @relation(fields: [institutionId], references: [id])
+  user        User?        @relation(fields: [userId], references: [id])
+
+  @@index([institutionId, createdAt])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+// =============================================
+// FEATURE FLAGS
+// =============================================
+
+model FeatureFlag {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  name          String
+  description   String?
+  isEnabled     Boolean  @default(false)
+  enabledForAll Boolean  @default(false)
+  enabledPlans  PlanType[]
+  enabledInstitutions String[] // Institution IDs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("feature_flags")
+}
+
+// =============================================
+// ANALYTICS (Aggregated)
+// =============================================
+
+model DailyAnalytics {
+  id                    String   @id @default(cuid())
+  institutionId         String
+  date                  DateTime @db.Date
+  totalAppointments     Int      @default(0)
+  completedAppointments Int      @default(0)
+  cancelledAppointments Int      @default(0)
+  noShowAppointments    Int      @default(0)
+  totalTokens           Int      @default(0)
+  averageWaitMinutes    Float?
+  activeUsers           Int      @default(0)
+  newUsers              Int      @default(0)
+  ticketsOpened         Int      @default(0)
+  ticketsResolved       Int      @default(0)
+  createdAt             DateTime @default(now())
+
+  @@unique([institutionId, date])
+  @@map("daily_analytics")
+}
