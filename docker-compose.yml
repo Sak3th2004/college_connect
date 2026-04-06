@@ -6,11 +6,12 @@ services:
     container_name: campusconnect-db
     restart: unless-stopped
     ports:
-      - '5432:5432'
+      - '5433:5432'
     environment:
       POSTGRES_USER: campusconnect
       POSTGRES_PASSWORD: campusconnect_dev_password
       POSTGRES_DB: campusconnect
+      POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
