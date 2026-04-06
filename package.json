@@ -1,0 +1,29 @@
+{
+  "name": "campusconnect",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "dev:web": "npm run dev --workspace=@campusconnect/web",
+    "dev:api": "npm run dev --workspace=@campusconnect/api-server",
+    "db:generate": "npm run db:generate --workspace=@campusconnect/api-server",
+    "db:push": "npm run db:push --workspace=@campusconnect/api-server",
+    "db:migrate": "npm run db:migrate --workspace=@campusconnect/api-server",
+    "db:seed": "npm run db:seed --workspace=@campusconnect/api-server",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
