@@ -120,6 +120,15 @@ export const updateUserSchema = z.object({
   suspensionReason: z.string().max(500).optional().nullable(),
 });
 
+export const userFilterSchema = z.object({
+  search: z.string().max(100).optional(),
+  role: z.nativeEnum(UserRole).optional(),
+  departmentId: z.string().cuid().optional(),
+  isActive: z.boolean().optional(),
+  isEmailVerified: z.boolean().optional(),
+  ...paginationSchema.shape,
+});
+
 // =============================================
 // STUDENT PROFILE SCHEMAS
 // =============================================
@@ -332,6 +341,113 @@ export const createLeaveSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   leaveType: z.enum(['CASUAL', 'SICK', 'VACATION', 'CONFERENCE', 'OTHER']),
   reason: z.string().max(500).optional(),
+});
+
+export const departmentSchema = z.object({
+  name: z.string().min(2, 'Department name is required').max(200).trim(),
+  code: z.string().min(2).max(20).toUpperCase(),
+  description: z.string().max(500).optional(),
+  headOfDepartment: z.string().cuid().optional(),
+  email: emailSchema.optional(),
+  phone: phoneSchema,
+  building: z.string().max(100).optional(),
+  floor: z.string().max(20).optional(),
+});
+
+export const updateDepartmentSchema = z.object({
+  name: z.string().min(1).max(200).trim().optional(),
+  code: z.string().min(2).max(20).toUpperCase().optional(),
+  description: z.string().max(500).optional().nullable(),
+  headOfDepartment: z.string().cuid().optional().nullable(),
+  email: emailSchema.optional().nullable(),
+  phone: phoneSchema.optional().nullable(),
+  building: z.string().max(100).optional().nullable(),
+  floor: z.string().max(20).optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+export const departmentFilterSchema = z.object({
+  search: z.string().max(100).optional(),
+  isActive: z.boolean().optional(),
+  ...paginationSchema.shape,
+});
+
+export const institutionSchema = z.object({
+  name: z.string().min(2, 'Institution name is required').max(200).trim(),
+  code: z.string().min(2).max(20).toUpperCase().regex(/^[A-Z0-9-]+$/, 'Code can only contain letters, numbers, and hyphens'),
+  slug: z.string().min(2).max(50).toLowerCase().regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens'),
+  address: z.string().max(500).optional(),
+  city: z.string().max(100).optional(),
+  state: z.string().max(100).optional(),
+  country: z.string().max(100).default('India'),
+  pincode: z.string().max(10).optional(),
+  phone: phoneSchema,
+  email: emailSchema.optional(),
+  website: z.string().url().optional(),
+  logo: z.string().url().optional(),
+  favicon: z.string().url().optional(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  timezone: z.string().default('Asia/Kolkata'),
+  workingDays: z.array(z.number().int().min(0).max(6)).default([1, 2, 3, 4, 5]),
+  workingHoursStart: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).default('09:00'),
+  workingHoursEnd: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).default('17:00'),
+  maxAppointmentsPerStudent: z.number().int().min(1).max(10).default(3),
+  tokenAutoExpireMinutes: z.number().int().min(5).max(120).default(30),
+  onboardingStatus: z.nativeEnum(OnboardingStatus).default('STARTED'),
+});
+
+export const updateInstitutionSchema = z.object({
+  name: z.string().min(1).max(200).trim().optional(),
+  address: z.string().max(500).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(100).optional().nullable(),
+  country: z.string().max(100).optional().nullable(),
+  pincode: z.string().max(10).optional().nullable(),
+  phone: phoneSchema.optional().nullable(),
+  email: emailSchema.optional().nullable(),
+  website: z.string().url().optional().nullable(),
+  logo: z.string().url().optional().nullable(),
+  favicon: z.string().url().optional().nullable(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+  timezone: z.string().optional(),
+  workingDays: z.array(z.number().int().min(0).max(6)).optional(),
+  workingHoursStart: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  workingHoursEnd: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  maxAppointmentsPerStudent: z.number().int().min(1).max(10).optional(),
+  tokenAutoExpireMinutes: z.number().int().min(5).max(120).optional(),
+});
+
+export const institutionFilterSchema = z.object({
+  search: z.string().max(100).optional(),
+  status: z.boolean().optional(),
+  onboardingStatus: z.nativeEnum(OnboardingStatus).optional(),
+  ...paginationSchema.shape,
+});
+
+export const institutionStatsSchema = z.object({
+  period: z.enum(['week', 'month', 'year']).default('month'),
+});
+
+export const institutionBrandingSchema = z.object({
+  logo: z.string().url().optional(),
+  favicon: z.string().url().optional(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+});
+
+export const cannedResponseSchema = z.object({
+  title: z.string().min(5).max(200).trim(),
+  content: z.string().min(10).max(5000).trim(),
+  category: z.string().min(2).max(50).trim(),
+  shortcut: z.string().max(20).optional(),
+});
+
+export const knowledgeBaseArticleSchema = z.object({
+  title: z.string().min(5).max(200).trim(),
+  content: z.string().min(100).max(50000).trim(),
+  excerpt: z.string().max(500).optional(),
+  category: z.string().min(2).max(50).trim(),
+  tags: z.array(z.string().max(30)).max(10).default([]),
+  isPublished: z.boolean().default(false),
 });
 
 // =============================================

@@ -7,34 +7,85 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/auth.store';
+import type { UserRole } from '@campusconnect/shared';
 
 export default function SignupPage() {
   const router = useRouter();
+  const { login } = useAuthStore();
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<UserRole>('STUDENT');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-    const formData = new FormData(e.currentTarget);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
 
     try {
       if (step === 1) {
-        // Validate email domain and move to step 2
+        // Email validation
+        if (!email.includes('@')) {
+          setError('Please enter a valid email');
+          setIsLoading(false);
+          return;
+        }
         setStep(2);
         setIsLoading(false);
         return;
       }
 
-      // TODO: Implement actual signup
-      console.log('Signup attempt:', Object.fromEntries(formData));
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.push('/verify-email');
-    } catch (err) {
-      setError('Failed to create account. Please try again.');
+      // Step 2: Validate passwords
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
+        setIsLoading(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        setIsLoading(false);
+        return;
+      }
+
+      // Call signup API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName,
+          role,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error?.message || 'Registration failed');
+      }
+
+      // Auto-login after successful registration
+      if (data.data?.tokens) {
+        await login(email, password);
+      }
+
+      toast.success('Account created successfully!');
+      router.push('/dashboard');
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to create account. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +110,7 @@ export default function SignupPage() {
                 {error}
               </div>
             )}
-            
+
             {step === 1 ? (
               <>
                 <div className="space-y-2">
@@ -71,6 +122,9 @@ export default function SignupPage() {
                     placeholder="you@college.edu"
                     required
                     autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                   <p className="text-xs text-muted-foreground">
                     Use your official college email address
@@ -83,6 +137,9 @@ export default function SignupPage() {
                     name="role"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     required
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as UserRole)}
+                    disabled={isLoading}
                   >
                     <option value="STUDENT">Student</option>
                     <option value="FACULTY">Faculty / Professor</option>
@@ -100,6 +157,9 @@ export default function SignupPage() {
                       type="text"
                       placeholder="John"
                       required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -110,6 +170,9 @@ export default function SignupPage() {
                       type="text"
                       placeholder="Doe"
                       required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -122,6 +185,9 @@ export default function SignupPage() {
                     placeholder="••••••••"
                     required
                     autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                   <p className="text-xs text-muted-foreground">
                     Must be at least 8 characters with 1 uppercase, 1 number
@@ -136,6 +202,9 @@ export default function SignupPage() {
                     placeholder="••••••••"
                     required
                     autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
               </>
